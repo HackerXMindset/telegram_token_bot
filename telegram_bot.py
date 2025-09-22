@@ -483,13 +483,38 @@ async def process_analysis(update: Update, ca: str):
         result = await analyze_token(ca)
         formatted_data, image_url = format_token_data(result)
 
+        # Telegram message length limit is 4096 characters
+        max_message_length = 4096
+
         if image_url:
             image_sent = await download_and_send_image(update, image_url)
             if not image_sent:
                 # If image fails, add a link to the text message
                 formatted_data = f'<a href="{image_url}">🖼️</a>\n{formatted_data}'
 
-        await update.message.reply_text(formatted_data, parse_mode='HTML', disable_web_page_preview=True)
+        # Split message if it's too long
+        if len(formatted_data) > max_message_length:
+            messages_to_send = []
+            current_message = []
+            current_length = 0
+
+            # Split by lines and try to find section headers for logical breaks
+            lines = formatted_data.split('\n')
+            for line in lines:
+                line_length = len(line) + 1 # +1 for newline character
+                if current_length + line_length > max_message_length and current_message:
+                    messages_to_send.append('\n'.join(current_message))
+                    current_message = []
+                    current_length = 0
+                current_message.append(line)
+                current_length += line_length
+            if current_message:
+                messages_to_send.append('\n'.join(current_message))
+
+            for msg in messages_to_send:
+                await update.message.reply_text(msg, parse_mode='HTML', disable_web_page_preview=True)
+        else:
+            await update.message.reply_text(formatted_data, parse_mode='HTML', disable_web_page_preview=True)
 
     except Exception as e:
         import traceback
