@@ -9,6 +9,16 @@ pub struct TokenData {
     pub supply_info: Option<SupplyInfo>,
     pub creator_info: Option<CreatorInfo>,
     pub pump_fun_data: Option<PumpFunData>,
+    pub jupiter_data: Option<JupiterTokenData>,
+    pub dexscreener_orders_data: Option<Vec<DexScreenerOrder>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DexScreenerOrder {
+    pub r#type: String,
+    pub status: String,
+    pub payment_timestamp: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,6 +96,12 @@ pub struct TokenPair {
     #[serde(rename = "pairCreatedAt")]
     pub pair_created_at: Option<i64>,
     pub info: Option<Info>,
+    pub boosts: Option<Boosts>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Boosts {
+    pub active: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -253,7 +269,129 @@ pub struct PumpFunData {
     pub video_uri: Option<String>,
 }
 
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiError {
-    pub error: String,
+#[serde(rename_all = "camelCase")]
+pub struct JupiterTokenData {
+    pub id: String,
+    pub name: String,
+    pub symbol: String,
+    #[serde(default)]
+    pub icon: Option<String>,
+    pub decimals: u8,
+    #[serde(default)]
+    pub dev: Option<String>,
+    #[serde(default)]
+    pub circ_supply: Option<f64>,
+    #[serde(default)]
+    pub total_supply: Option<f64>,
+    pub token_program: String,
+    #[serde(default)]
+    pub launchpad: Option<String>,
+    #[serde(default)]
+    pub first_pool: Option<FirstPool>,
+    #[serde(default)]
+    pub graduated_pool: Option<String>,
+    #[serde(default)]
+    pub graduated_at: Option<String>,
+    #[serde(default)]
+    pub holder_count: Option<u64>,
+    #[serde(default)]
+    pub audit: Option<Audit>,
+    #[serde(default)]
+    pub organic_score: Option<f64>,
+    #[serde(default)]
+    pub organic_score_label: Option<String>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub fdv: Option<f64>,
+    #[serde(default)]
+    pub mcap: Option<f64>,
+    #[serde(default)]
+    pub usd_price: Option<f64>,
+    #[serde(default)]
+    pub price_block_id: Option<u64>,
+    #[serde(default)]
+    pub liquidity: Option<f64>,
+    #[serde(rename = "stats5m", default)]
+    pub stats_5m: Option<Stats>,
+    #[serde(rename = "stats1h", default)]
+    pub stats_1h: Option<Stats>,
+    #[serde(rename = "stats6h", default)]
+    pub stats_6h: Option<Stats>,
+    #[serde(rename = "stats24h", default)]
+    pub stats_24h: Option<Stats>,
+    #[serde(default)]
+    pub bonding_curve: Option<f64>,
+    pub updated_at: String,
+    #[serde(default)]
+    pub twitter: Option<String>,
+    #[serde(default)]
+    pub telegram: Option<String>,
+    #[serde(default)]
+    pub website: Option<String>,
+    #[serde(default)]
+    pub ct_likes: Option<u64>,
+    #[serde(rename = "isVerified", default)]
+    pub is_verified: Option<bool>,
+    #[serde(default)]
+    pub cexes: Option<Vec<String>>,
+    #[serde(rename = "smartCtLikes", default)]
+    pub smart_ct_likes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FirstPool {
+    pub id: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Audit {
+    #[serde(default)]
+    pub mint_authority_disabled: Option<bool>,
+    #[serde(default)]
+    pub freeze_authority_disabled: Option<bool>,
+    #[serde(default)]
+    pub top_holders_percentage: Option<f64>,
+    #[serde(default)]
+    pub snipers_holding_percentage: Option<f64>,
+    #[serde(default)]
+    pub dev_migrations: Option<u64>,
+    #[serde(rename = "devBalancePercentage", default)]
+    pub dev_balance_percentage: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Stats {
+    #[serde(default)]
+    pub price_change: Option<f64>,
+    #[serde(default)]
+    pub holder_change: Option<f64>,
+    #[serde(default)]
+    pub liquidity_change: Option<f64>,
+    #[serde(default)]
+    pub volume_change: Option<f64>,
+    #[serde(default)]
+    pub buy_volume: Option<f64>,
+    #[serde(default)]
+    pub sell_volume: Option<f64>,
+    #[serde(default)]
+    pub buy_organic_volume: Option<f64>,
+    #[serde(default)]
+    pub sell_organic_volume: Option<f64>,
+    #[serde(default)]
+    pub num_buys: Option<u64>,
+    #[serde(default)]
+    pub num_sells: Option<u64>,
+    #[serde(default)]
+    pub num_traders: Option<u64>,
+    #[serde(default)]
+    pub num_organic_buyers: Option<u64>,
+    #[serde(default)]
+    pub num_net_buyers: Option<u64>,
 }

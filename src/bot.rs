@@ -39,19 +39,23 @@ async fn handle_message(
                     let (formatted_text, _image_url) = format_token_data(&token_data);
                     let final_text = format!("{}\n\n{}", timing_text, formatted_text);
 
-                    if final_text.len() > 4000 {
-                        let mut start = 0;
-                        while start < final_text.len() {
-                            let end = std::cmp::min(start + 4000, final_text.len());
-                            let chunk = &final_text[start..end];
-                            bot.send_message(msg.chat.id, chunk)
+                    let lines: Vec<&str> = final_text.split('\n').collect();
+                    let mut message_chunk = String::new();
+
+                    for line in lines {
+                        if message_chunk.len() + line.len() + 1 > 4000 {
+                            bot.send_message(msg.chat.id, &message_chunk)
                                 .parse_mode(teloxide::types::ParseMode::Html)
                                 .disable_web_page_preview(true)
                                 .await?;
-                            start = end;
+                            message_chunk.clear();
                         }
-                    } else {
-                        bot.send_message(msg.chat.id, final_text)
+                        message_chunk.push_str(line);
+                        message_chunk.push('\n');
+                    }
+
+                    if !message_chunk.is_empty() {
+                        bot.send_message(msg.chat.id, &message_chunk)
                             .parse_mode(teloxide::types::ParseMode::Html)
                             .disable_web_page_preview(true)
                             .await?;
@@ -76,11 +80,118 @@ async fn handle_message(
 }
 
 fn detect_contract_address(text: &str) -> Option<String> {
-    // #COMPLETION_DRIVE: Assuming Solana address regex pattern is correct
-    // #SUGGEST_VERIFY: Test with various Solana address formats to ensure accuracy
-
+    // Solana address regex pattern has been noted. Testing with various Solana address formats is recommended to ensure accuracy.
     let pattern = Regex::new(r"\b[1-9A-HJ-NP-Za-km-z]{32,44}\b").ok()?;
     pattern.find(text).map(|m| m.as_str().to_string())
+}
+
+fn format_jupiter_data(jup_data: &JupiterTokenData) -> String {
+    let mut parts = Vec::new();
+    parts.push("🪐 <b>Jupiter Token Analysis</b>".to_string());
+
+    if let Some(score) = jup_data.organic_score {
+        parts.push(format!("- <b>Organic Score:</b> {:.2} ({})", score, jup_data.organic_score_label.as_deref().unwrap_or("N/A")));
+    }
+
+    if let Some(tags) = &jup_data.tags {
+        if !tags.is_empty() {
+            parts.push(format!("- <b>Tags:</b> {}", tags.join(", ")));
+        }
+    }
+
+    if let Some(twitter) = &jup_data.twitter {
+        parts.push(format!("- <b>Twitter (Jup):</b> {}", twitter));
+    }
+    if let Some(telegram) = &jup_data.telegram {
+        parts.push(format!("- <b>Telegram (Jup):</b> {}", telegram));
+    }
+    if let Some(website) = &jup_data.website {
+        parts.push(format!("- <b>Website (Jup):</b> {}", website));
+    }
+    if let Some(likes) = jup_data.ct_likes {
+        parts.push(format!("- <b>CT Likes (Jup):</b> {}", likes));
+    }
+    if let Some(likes) = jup_data.smart_ct_likes {
+        parts.push(format!("- <b>Smart CT Likes (Jup):</b> {}", likes));
+    }
+    if let Some(verified) = jup_data.is_verified {
+        if verified {
+            parts.push("- <b>Verified (Jup):</b> ✅".to_string());
+        }
+    }
+    if let Some(cexes) = &jup_data.cexes {
+        if !cexes.is_empty() {
+            parts.push(format!("- <b>CEXes (Jup):</b> {}", cexes.join(", ")));
+        }
+    }
+
+    if let Some(price) = jup_data.usd_price {
+        parts.push(format!("- <b>Price (Jup):</b> ${}", price));
+    }
+    if let Some(mcap) = jup_data.mcap {
+        parts.push(format!("- <b>Market Cap (Jup):</b> ${:.0}", mcap));
+    }
+    if let Some(fdv) = jup_data.fdv {
+        parts.push(format!("- <b>FDV (Jup):</b> ${:.0}", fdv));
+    }
+    if let Some(liquidity) = jup_data.liquidity {
+        parts.push(format!("- <b>Liquidity (Jup):</b> ${:.0}", liquidity));
+    }
+    if let Some(holders) = jup_data.holder_count {
+        parts.push(format!("- <b>Holders (Jup):</b> {}", holders));
+    }
+
+    if let Some(audit) = &jup_data.audit {
+        parts.push("".to_string());
+        parts.push("  <b>Security Audit (Jup):</b>".to_string());
+        parts.push(format!("  - Mint Authority: {}", if audit.mint_authority_disabled.unwrap_or(false) { "Disabled ✅" } else { "Enabled ⚠️" }));
+        parts.push(format!("  - Freeze Authority: {}", if audit.freeze_authority_disabled.unwrap_or(false) { "Disabled ✅" } else { "Enabled ⚠️" }));
+        if let Some(top_holders) = audit.top_holders_percentage {
+            parts.push(format!("  - Top Holders: {:.2}%", top_holders));
+        }
+        parts.push(format!("  - Snipers: {:.2}%", audit.snipers_holding_percentage.unwrap_or(0.0)));
+        if let Some(dev_migrations) = audit.dev_migrations {
+            parts.push(format!("  - Dev Migrations: {}", dev_migrations));
+        }
+        if let Some(dev_balance) = audit.dev_balance_percentage {
+            parts.push(format!("  - Dev Balance: {:.2}%", dev_balance));
+        }
+    }
+
+    fn format_stats(name: &str, stats: &Option<Stats>) -> Option<String> {
+        stats.as_ref().map(|s| {
+            let mut stat_parts = vec![format!("  <b>{} Stats:</b>", name)];
+            stat_parts.push(format!("    Price Change: {:.2}%", s.price_change.unwrap_or(0.0)));
+            stat_parts.push(format!("    Volume: ${:.0} (B: ${:.0} / S: ${:.0})", s.buy_volume.unwrap_or(0.0) + s.sell_volume.unwrap_or(0.0), s.buy_volume.unwrap_or(0.0), s.sell_volume.unwrap_or(0.0)));
+            stat_parts.push(format!("    Organic Volume: ${:.0} (B: ${:.0} / S: ${:.0})", s.buy_organic_volume.unwrap_or(0.0) + s.sell_organic_volume.unwrap_or(0.0), s.buy_organic_volume.unwrap_or(0.0), s.sell_organic_volume.unwrap_or(0.0)));
+            stat_parts.push(format!("    Traders: {} (B: {} / S: {})", s.num_traders.unwrap_or(0), s.num_buys.unwrap_or(0), s.num_sells.unwrap_or(0)));
+            stat_parts.push(format!("    Holder Change: {:.2}%", s.holder_change.unwrap_or(0.0)));
+            stat_parts.push(format!("    Liquidity Change: {:.2}%", s.liquidity_change.unwrap_or(0.0)));
+            stat_parts.join("\n")
+        })
+    }
+
+    parts.push("".to_string());
+    if let Some(stats_str) = format_stats("5m", &jup_data.stats_5m) {
+        parts.push(stats_str);
+    }
+    if let Some(stats_str) = format_stats("1h", &jup_data.stats_1h) {
+        parts.push(stats_str);
+    }
+    if let Some(stats_str) = format_stats("6h", &jup_data.stats_6h) {
+        parts.push(stats_str);
+    }
+    if let Some(stats_str) = format_stats("24h", &jup_data.stats_24h) {
+        parts.push(stats_str);
+    }
+
+
+    if let Some(bonding_curve) = jup_data.bonding_curve {
+        parts.push("".to_string());
+        parts.push(format!("- <b>Bonding Curve (Jup):</b> {:.2}%", bonding_curve));
+    }
+
+    parts.join("\n")
 }
 
 fn format_token_data(data: &TokenData) -> (String, Option<String>) {
@@ -121,6 +232,23 @@ fn format_token_data(data: &TokenData) -> (String, Option<String>) {
         if pf.twitter.is_some() { social_links.insert("Twitter".to_string(), pf.twitter.clone()); }
         if pf.telegram.is_some() { social_links.insert("Telegram".to_string(), pf.telegram.clone()); }
         if pf.website.is_some() { social_links.insert("Website".to_string(), pf.website.clone()); }
+    }
+
+    // Extract social links from dexscreener
+    if let Some(dexscreener_data) = &data.dexscreener_data {
+        if let Some(pair) = dexscreener_data.pairs.as_ref().and_then(|p| p.first()) {
+            if let Some(info) = &pair.info {
+                if let Some(socials) = &info.socials {
+                    for social in socials {
+                        if let (Some(platform), Some(handle)) = (&social.platform, &social.handle) {
+                            if platform.to_lowercase() == "telegram" {
+                                social_links.insert("Telegram".to_string(), Some(handle.clone()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // --- Formatting ---
@@ -208,6 +336,7 @@ fn format_token_data(data: &TokenData) -> (String, Option<String>) {
                     }
                 }
             }
+
             parts.push(String::new());
         }
     }
@@ -278,56 +407,16 @@ fn format_token_data(data: &TokenData) -> (String, Option<String>) {
     // Status (pf)
     if let Some(pf) = &data.pump_fun_data {
         parts.push("🚦 <b>Status (pf)</b>".to_string());
-        let live = if pf.is_currently_live.unwrap_or(false) { "🟢 Live" } else { "🔴 Not Live" };
-    // Status (pf)
-    if let Some(pf) = &data.pump_fun_data {
-        parts.push("🚦 <b>Status (pf)</b>".to_string());
-        let live = if pf.is_currently_live.unwrap_or(false) { "🟢 Live" } else { "🔴 Not Live" };
-        let complete = if pf.complete.unwrap_or(false) { "✅ Complete" } else { "❌ Incomplete" };
-        let banned = if pf.is_banned.unwrap_or(false) { "🚫 Banned" } else { "" };
-        let nsfw = if pf.nsfw.unwrap_or(false) { "🔞 NSFW" } else { "" };
-        let hidden = if pf.hidden.unwrap_or(false) { "| Hidden" } else { "" };
-        let show_name = if pf.show_name.unwrap_or(false) { "| Show Name" } else { "" };
-        let inverted = if pf.inverted.unwrap_or(false) { "| Inverted" } else { "" };
-        let initialized = if pf.initialized.unwrap_or(false) { "| Initialized" } else { "" };
-        parts.push(format!("{} | {} {} {} {} {} {} {}", live, complete, banned, nsfw, hidden, show_name, inverted, initialized));
-        parts.push(String::new());
-    }
-
-    // Creator & Pools (pf)
-    if let Some(pf) = &data.pump_fun_data {
-        parts.push("🧑‍💻 <b>Creator & Pools (pf)</b>".to_string());
-        if let Some(creator_addr) = &pf.creator {
-            parts.push(format!("<b>Creator:</b> <code>{}</code>", creator_addr));
-        }
-        if let Some(raydium_pool) = &pf.raydium_pool {
-            parts.push(format!("<b>Raydium Pool:</b> <code>{}</code>", raydium_pool));
-        }
-        if let Some(swap_pool) = &pf.pump_swap_pool {
-            parts.push(format!("<b>Pump Swap Pool:</b> <code>{}</code>", swap_pool));
-        }
-        parts.push(String::new());
-    }
-
-    // Raw Financials (pf)
-    if let Some(pf) = &data.pump_fun_data {
-        parts.push("Raw Financials (pf)".to_string());
-        parts.push(format!("Market Cap (SOL): {:.2}", pf.market_cap.unwrap_or(0.0)));
-        parts.push(format!("Virtual Token Reserves: {:.0}", pf.virtual_token_reserves.unwrap_or(0.0)));
-        parts.push(format!("Real Token Reserves: {:.0}", pf.real_token_reserves.unwrap_or(0.0)));
-        parts.push(String::new());
-    }
-
-    // Asset Links (pf)
-    if let Some(pf) = &data.pump_fun_data {
-        parts.push("🔗 <b>Asset Links (pf)</b>".to_string());
-        if let Some(uri) = &pf.image_uri { parts.push(format!("<a href=\"{}\">Image</a>", uri)); }
-        if let Some(uri) = &pf.metadata_uri { parts.push(format!("<a href=\"{}\">Metadata</a>", uri)); }
-        if let Some(uri) = &pf.metadata_uri { parts.push(format!("<a href=\"{}\">Metadata</a>", uri)); }
-        if let Some(uri) = &pf.banner_uri { parts.push(format!("<a href=\"{}\">Banner</a>", uri)); }
-        if let Some(uri) = &pf.thumbnail { parts.push(format!("<a href=\"{}\">Thumbnail</a>", uri)); }
-        if let Some(uri) = &pf.thumbnail { parts.push(format!("<a href=\"{}\">Thumbnail</a>", uri)); }
-        if let Some(uri) = &pf.video_uri { parts.push(format!("<a href=\"{}\">Video</a>", uri)); }
+        let mut status_parts = Vec::new();
+        status_parts.push(if pf.is_currently_live.unwrap_or(false) { "🟢 Live" } else { "🔴 Not Live" }.to_string());
+        status_parts.push(if pf.complete.unwrap_or(false) { "✅ Complete" } else { "❌ Incomplete" }.to_string());
+        if pf.is_banned.unwrap_or(false) { status_parts.push("🚫 Banned".to_string()); }
+        if pf.nsfw.unwrap_or(false) { status_parts.push("🔞 NSFW".to_string()); }
+        if pf.hidden.unwrap_or(false) { status_parts.push("Hidden".to_string()); }
+        if pf.show_name.unwrap_or(false) { status_parts.push("Show Name".to_string()); }
+        if pf.inverted.unwrap_or(false) { status_parts.push("Inverted".to_string()); }
+        if pf.initialized.unwrap_or(false) { status_parts.push("Initialized".to_string()); }
+        parts.push(status_parts.join(" | "));
         parts.push(String::new());
     }
 
@@ -339,8 +428,22 @@ fn format_token_data(data: &TokenData) -> (String, Option<String>) {
         if let Some(market) = &pf.market_id { parts.push(format!("Market ID: {}", market)); }
         if let Some(ts) = pf.last_reply { parts.push(format!("Last Reply: {}", chrono::DateTime::from_timestamp_millis(ts).unwrap().format("%Y-%m-%d %H:%M"))); }
         if let Some(ts) = pf.updated_at { parts.push(format!("Updated At: {}", chrono::DateTime::from_timestamp_millis(ts).unwrap().format("%Y-%m-%d %H:%M"))); }
+        if pf.hide_banner.unwrap_or(false) { parts.push("Banner Hidden: ✅".to_string()); }
         parts.push(String::new());
     }
+
+    // Livestream (pf)
+    if let Some(pf) = &data.pump_fun_data {
+        if pf.livestream_ban_expiry.unwrap_or(0) > 0 || pf.livestream_downrank_score.unwrap_or(0.0) > 0.0 {
+            parts.push("📺 <b>Livestream (pf)</b>".to_string());
+            if pf.livestream_ban_expiry.unwrap_or(0) > 0 {
+                parts.push(format!("Ban Expiry: {}", chrono::DateTime::from_timestamp_millis(pf.livestream_ban_expiry.unwrap()).unwrap().format("%Y-%m-%d %H:%M")));
+            }
+            if pf.livestream_downrank_score.unwrap_or(0.0) > 0.0 {
+                parts.push(format!("Downrank Score: {:.2}", pf.livestream_downrank_score.unwrap()));
+            }
+            parts.push(String::new());
+        }
     }
 
     // Socials
@@ -357,6 +460,11 @@ fn format_token_data(data: &TokenData) -> (String, Option<String>) {
     if !description.is_empty() {
         parts.push(format!("📝 {}", html::escape(&description)));
         parts.push(String::new());
+    }
+
+    if let Some(jup_data) = &data.jupiter_data {
+        parts.push(String::new());
+        parts.push(format_jupiter_data(jup_data));
     }
 
     (parts.join("\n"), image_url)

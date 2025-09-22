@@ -1,6 +1,5 @@
 use crate::types::*;
 use anyhow::{Result, anyhow};
-use moka::future::Cache;
 use reqwest::Client;
 use serde_json::json;
 use std::env;
@@ -10,7 +9,6 @@ use tokio::time::timeout;
 pub struct ApiClient {
     client: Client,
     api_key: String,
-    cache: Cache<String, TokenData>,
 }
 
 impl ApiClient {
@@ -21,35 +19,29 @@ impl ApiClient {
             .timeout(Duration::from_secs(5))
             .build()?;
 
-        let cache = Cache::builder()
-            .max_capacity(1000)
-            .time_to_live(Duration::from_secs(60))
-            .build();
-
         Ok(Self {
             client,
             api_key,
-            cache,
         })
     }
 
     pub async fn analyze_token(&self, mint_address: &str) -> Result<TokenData> {
-        if let Some(cached) = self.cache.get(mint_address).await {
-            return Ok(cached);
-        }
-
         let (
             metadata_result,
             dexscreener_result,
             holders_result,
             supply_result,
             pump_fun_result,
+            jupiter_result,
+            dexscreener_orders_result,
         ) = tokio::join!(
             self.query_metadata_v1(mint_address),
             self.get_dexscreener_data(mint_address),
             self.get_token_largest_accounts(mint_address),
             self.get_token_supply_info(mint_address),
-            self.get_pump_fun_data(mint_address)
+            self.get_pump_fun_data(mint_address),
+            self.fetch_jupiter_token_data(mint_address),
+            self.get_dexscreener_orders_data("solana", mint_address),
         );
 
         let token_data = TokenData {
@@ -60,9 +52,9 @@ impl ApiClient {
             supply_info: supply_result.ok(),
             creator_info: None,
             pump_fun_data: pump_fun_result.ok(),
+            jupiter_data: jupiter_result.ok(),
+            dexscreener_orders_data: dexscreener_orders_result.ok(),
         };
-
-        self.cache.insert(mint_address.to_string(), token_data.clone()).await;
 
         Ok(token_data)
     }
@@ -127,11 +119,49 @@ impl ApiClient {
     async fn get_pump_fun_data(&self, mint_address: &str) -> Result<PumpFunData> {
         let url = format!("https://frontend-api-v3.pump.fun/coins/{}?sync=true", mint_address);
         let jwt = env::var("PUMP_FUN_JWT").unwrap_or_default();
-        let response = self.client.get(&url).bearer_auth(jwt).send().await?;
+        let response = timeout(
+            Duration::from_secs(5),
+            self.client.get(&url).bearer_auth(jwt).send()
+        ).await??;
         if response.status() == 404 {
             return Err(anyhow!("Token not found on pump.fun"));
         }
         let data: PumpFunData = response.json().await?;
+        Ok(data)
+    }
+
+    async fn fetch_jupiter_token_data(&self, mint_address: &str) -> Result<JupiterTokenData> {
+        let url = format!("https://lite-api.jup.ag/tokens/v2/search?query={}", mint_address);
+        let response = timeout(
+            Duration::from_secs(5),
+            self.client.get(&url).send()
+        ).await??;
+
+        if response.status().is_client_error() || response.status().is_server_error() {
+            if response.status() == reqwest::StatusCode::NOT_FOUND {
+                return Err(anyhow!("Token not found on Jupiter (404)"));
+            }
+            return Err(anyhow!("Jupiter API returned an error: {}", response.status()));
+        }
+        let data: Vec<JupiterTokenData> = response.json().await?;
+        data.into_iter().next().ok_or_else(|| anyhow!("No Jupiter data found"))
+    }
+
+    async fn get_dexscreener_orders_data(&self, chain_id: &str, token_address: &str) -> Result<Vec<DexScreenerOrder>> {
+        let url = format!("https://api.dexscreener.com/orders/v1/{}/{}", chain_id, token_address);
+        let response = timeout(
+            Duration::from_secs(5),
+            self.client.get(&url).send()
+        ).await??;
+
+        if response.status().is_client_error() || response.status().is_server_error() {
+            if response.status() == reqwest::StatusCode::NOT_FOUND {
+                return Err(anyhow!("DexScreener Orders: Token not found (404)"));
+            }
+            return Err(anyhow!("DexScreener Orders API returned an error: {}", response.status()));
+        }
+
+        let data: Vec<DexScreenerOrder> = response.json().await?;
         Ok(data)
     }
 }
