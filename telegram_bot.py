@@ -13,6 +13,116 @@ from s import analyze_token
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+user_states = {}
+
+def format_data_for_display(data: dict) -> str:
+    message_parts = []
+
+    # Mint Address (always first)
+    if 'mint_address' in data and data['mint_address']:
+        message_parts.append(f"*Mint Address*: `{data['mint_address']}`")
+
+    # Metadata
+    if 'metadata' in data and data['metadata'] and data['metadata'].get('off_chain_metadata') and data['metadata']['off_chain_metadata'].get('metadata'):
+        meta = data['metadata']['off_chain_metadata']['metadata']
+        if meta.get('name'):
+            message_parts.append(f"*Name*: `{meta['name']}`")
+        if meta.get('symbol'):
+            message_parts.append(f"*Symbol*: `{meta['symbol']}`")
+        if meta.get('description'):
+            message_parts.append(f"*Description*: {meta['description']}")
+        if meta.get('website'):
+            message_parts.append(f"*Website*: {meta['website']}")
+        if meta.get('twitter'):
+            message_parts.append(f"*Twitter*: {meta['twitter']}")
+        if meta.get('telegram'):
+            message_parts.append(f"*Telegram*: {meta['telegram']}")
+
+    # DexScreener Data
+    if 'dexscreener_data' in data and data['dexscreener_data'] and data['dexscreener_data'].get('pairs'):
+        message_parts.append("\n*DexScreener Data*:")
+        for pair in data['dexscreener_data']['pairs']:
+            if pair.get('base_token') and pair['base_token'].get('symbol'):
+                message_parts.append(f"  - Pair: `{pair['base_token']['symbol']}/{pair['quote_token']['symbol'] if pair.get('quote_token') else '?'}`")
+            if pair.get('priceUsd'):
+                message_parts.append(f"    Price USD: `{float(pair['priceUsd']):,.6f}`")
+            if pair.get('marketCap'):
+                message_parts.append(f"    Market Cap: `{int(pair['marketCap']):,}`")
+            if pair.get('volume') and pair['volume'].get('h24'):
+                message_parts.append(f"    Volume (24h): `{int(pair['volume']['h24']):,}`")
+            if pair.get('liquidity') and pair['liquidity'].get('usd'):
+                message_parts.append(f"    Liquidity USD: `{int(pair['liquidity']['usd']):,}`")
+            if pair.get('fdv'):
+                message_parts.append(f"    FDV: `{int(pair['fdv']):,}`")
+            if pair.get('priceChange') and pair['priceChange'].get('h24'):
+                message_parts.append(f"    Price Change (24h): `{pair['priceChange']['h24']:.2f}%`")
+
+    # Pump.fun Data
+    if 'pump_fun_data' in data and data['pump_fun_data']:
+        pump_data = data['pump_fun_data']
+        message_parts.append("\n*Pump.fun Data*:")
+        if pump_data.get('market_cap'):
+            message_parts.append(f"  Market Cap: `{int(pump_data['market_cap']):,}`")
+        if pump_data.get('usd_market_cap'):
+            message_parts.append(f"  USD Market Cap: `{int(pump_data['usd_market_cap']):,}`")
+        if pump_data.get('total_supply'):
+            message_parts.append(f"  Total Supply: `{int(pump_data['total_supply']):,}`")
+        if pump_data.get('num_participants'):
+            message_parts.append(f"  Participants: `{int(pump_data['num_participants']):,}`")
+        if pump_data.get('website'):
+            message_parts.append(f"  Website: {pump_data['website']}")
+        if pump_data.get('twitter'):
+            message_parts.append(f"  Twitter: {pump_data['twitter']}")
+        if pump_data.get('telegram'):
+            message_parts.append(f"  Telegram: {pump_data['telegram']}")
+
+    # Jupiter Data
+    if 'jupiter_data' in data and data['jupiter_data']:
+        jupiter_data = data['jupiter_data']
+        message_parts.append("\n*Jupiter Data*:")
+        if jupiter_data.get('mcap'):
+            message_parts.append(f"  Market Cap: `{int(jupiter_data['mcap']):,}`")
+        if jupiter_data.get('usd_price'):
+            message_parts.append(f"  USD Price: `{jupiter_data['usd_price']:.6f}`")
+        if jupiter_data.get('liquidity'):
+            message_parts.append(f"  Liquidity: `{int(jupiter_data['liquidity']):,}`")
+        if jupiter_data.get('holder_count'):
+            message_parts.append(f"  Holder Count: `{int(jupiter_data['holder_count']):,}`")
+        if jupiter_data.get('website'):
+            message_parts.append(f"  Website: {jupiter_data['website']}")
+        if jupiter_data.get('twitter'):
+            message_parts.append(f"  Twitter: {jupiter_data['twitter']}")
+        if jupiter_data.get('telegram'):
+            message_parts.append(f"  Telegram: {jupiter_data['telegram']}")
+        if jupiter_data.get('stats_24h') and jupiter_data['stats_24h'].get('price_change'):
+            message_parts.append(f"  Price Change (24h): `{jupiter_data['stats_24h']['price_change']:.2f}%`")
+        if jupiter_data.get('stats_24h') and jupiter_data['stats_24h'].get('volume_change'):
+            message_parts.append(f"  Volume Change (24h): `{jupiter_data['stats_24h']['volume_change']:.2f}%`")
+
+    # Holders Data
+    if 'holders' in data and data['holders'] and data['holders'].get('result') and data['holders']['result'].get('value'):
+        message_parts.append("\n*Top Holders*:")
+        for i, holder in enumerate(data['holders']['result']['value'][:5]): # Limit to top 5
+            if holder.get('address') and holder.get('ui_amount'):
+                message_parts.append(f"  {i+1}. `{holder['address']}`: `{holder['ui_amount']:,.2f}`")
+
+    # Supply Info
+    if 'supply_info' in data and data['supply_info'] and data['supply_info'].get('result') and data['supply_info']['result'].get('value'):
+        supply_value = data['supply_info']['result']['value']
+        message_parts.append("\n*Supply Info*:")
+        if supply_value.get('ui_amount'):
+            message_parts.append(f"  Total Supply: `{supply_value['ui_amount']:,.0f}`")
+
+    # DexScreener Orders Data
+    if 'dexscreener_orders_data' in data and data['dexscreener_orders_data']:
+        message_parts.append("\n*DexScreener Orders*:")
+        for i, order in enumerate(data['dexscreener_orders_data'][:5]): # Limit to 5 orders
+            if order.get('type') and order.get('status'):
+                message_parts.append(f"  {i+1}. Type: `{order['type']}`, Status: `{order['status']}`")
+
+    return "\n".join(message_parts)
+
+
 def detect_contract_address(text):
     """Detect Solana contract address in text (base58, 32-44 chars)"""
     pattern = r'\b[1-9A-HJ-NP-Za-km-z]{32,44}\b'
@@ -143,15 +253,15 @@ def format_token_data(data):
         parts.append("💰 <b>Price & Market Data</b>")
 
         # Price with native price if available
-        price_line = f"💵 <b>Price:</b> ${price:.8f}"
+        price_line = f"💵 <b>Price (Dex):</b> ${price:.8f}"
         if price_native > 0:
-            price_line += f" | <b>Native:</b> {price_native:.8f}"
+            price_line += f" | <b>Native (Dex):</b> {price_native:.8f}"
         parts.append(price_line)
 
-        parts.append(f"🧢 <b>MC (pf):</b> ${market_cap:,.0f} | 💎 <b>FDV:</b> ${fdv:,.0f}")
+        parts.append(f"🧢 <b>MC (pf):</b> ${market_cap:,.0f} | 💎 <b>FDV (calc):</b> ${fdv:,.0f}")
         if ath_market_cap > 0:
             parts.append(f"🔥 <b>ATH (pf):</b> ${ath_market_cap:,.0f}")
-        parts.append(f'⏱️ <b>Pool Age:</b> {pool_age} | 🏢 <b>DEX:</b> {dex_name}')
+        parts.append(f'⏱️ <b>Pool Age (Dex):</b> {pool_age} | 🏢 <b>DEX (Dex):</b> {dex_name}')
 
         # Pair labels if available
         if pair_labels:
@@ -165,13 +275,13 @@ def format_token_data(data):
         parts.append('')
 
         # Volume Data
-        parts.append("📊 <b>Volume Data</b>")
+        parts.append("📊 <b>Volume Data (Dex)</b>")
         parts.append(f'<b>5m:</b> ${volume_5m:,.0f} | <b>1h:</b> ${volume_1h:,.0f}')
         parts.append(f'<b>6h:</b> ${volume_6h:,.0f} | <b>24h:</b> ${volume_24h:,.0f}')
         parts.append('')
 
         # Price Changes
-        parts.append("📈 <b>Price Changes</b>")
+        parts.append("📈 <b>Price Changes (Dex)</b>")
         def format_change(change):
             sign = "+" if change >= 0 else ""
             return f"{sign}{change:.2f}%"
@@ -181,7 +291,7 @@ def format_token_data(data):
         parts.append('')
 
         # Liquidity Breakdown
-        parts.append("💧 <b>Liquidity</b>")
+        parts.append("💧 <b>Liquidity (Dex)</b>")
         parts.append(f"<b>USD:</b> ${liquidity_usd:,.0f}")
         if liquidity_base > 0 or liquidity_quote > 0:
             parts.append(f"<b>Base:</b> {liquidity_base:,.0f} | <b>Quote:</b> {liquidity_quote:,.0f}")
@@ -189,7 +299,7 @@ def format_token_data(data):
 
         # Transaction Activity
         if buys_6h > 0 or sells_6h > 0 or buys_1h > 0 or sells_1h > 0:
-            parts.append("🔄 <b>Transaction Activity</b>")
+            parts.append("🔄 <b>Transaction Activity (Dex)</b>")
             parts.append(f'<b>6h:</b> {buys_6h} buys / {sells_6h} sells')
             parts.append(f'<b>1h:</b> {buys_1h} buys / {sells_1h} sells')
 
@@ -225,7 +335,7 @@ def format_token_data(data):
         top10_holders_data = holders_data[:10]
         top10_dist_percent = [ (h.get('uiAmount', 0) / supply * 100) for h in top10_holders_data ]
         top10_sum = sum(top10_dist_percent)
-        parts.append(f'👥 <b>Holders:</b> {total_holders} | <b>Top 10:</b> {top10_sum:.1f}%')
+        parts.append(f'👥 <b>Holders (pf/Helius):</b> {total_holders} | <b>Top 10:</b> {top10_sum:.1f}%')
         parts.append('')
 
         # Security & Dev
@@ -234,7 +344,7 @@ def format_token_data(data):
         sniper_count = pump_fun_data.get('sniperCount')
         if sniper_count is not None:
             sniper_percentage = pump_fun_data.get('sniperOwnedPercentage', 0)
-            parts.append(f"⚠️ <b>Risk:</b> Snipers: {sniper_count} ({sniper_percentage:.2f}%)")
+            parts.append(f"⚠️ <b>Risk (pf):</b> Snipers: {sniper_count} ({sniper_percentage:.2f}%)")
 
         creators = asset_data.get('creators', [])
         if creators:
@@ -269,19 +379,19 @@ def format_token_data(data):
                 sol_lamports = creator_sol_balance_data['result']['value']
                 sol_balance_str = f'| <b>Balance:</b> {(sol_lamports / 1_000_000_000):.2f} SOL'
 
-            parts.append(f'🧑‍💻 <b>Dev:</b> <a href="{creator_link}">{escape_html(short_addr)}</a> {dev_dot} ({escape_html(dev_status)}) <a href="{stats_link}">[Stats]</a> {sol_balance_str}')
+            parts.append(f'🧑‍💻 <b>Dev (pf/Helius):</b> <a href="{creator_link}">{escape_html(short_addr)}</a> {dev_dot} ({escape_html(dev_status)}) <a href="{stats_link}">[Stats]</a> {sol_balance_str}')
 
         dex_paid_dot = "🔴"
         if price_data.get('pairs') and price_data['pairs'][0].get('info', {}):
             dex_paid_dot = "🟢"
         info_link = f"https://t.me/phanespurplebot?start=dp_{ca}"
-        parts.append(f'├ <b>DEX:</b> {escape_html(dex_name)} | <b>DEX Paid:</b> {dex_paid_dot} <a href="{info_link}">[info]</a>')
+        parts.append(f'├ <b>DEX (Dex):</b> {escape_html(dex_name)} | <b>DEX Paid (Dex):</b> {dex_paid_dot} <a href="{info_link}">[info]</a>')
         
-        parts.append(f'🔧 <b>Mutable:</b> {"✅" if is_mutable else "❌"}')
+        parts.append(f'🔧 <b>Mutable (Helius):</b> {"✅" if is_mutable else "❌"}')
         parts.append('')
 
         # Socials
-        parts.append("🌐 <b>Socials</b>")
+        parts.append("🌐 <b>Socials (Helius/pf)</b>")
         social_links = {}
         if metadata.get('offChainMetadata', {}).get('metadata'):
             off_meta = metadata['offChainMetadata']['metadata']
