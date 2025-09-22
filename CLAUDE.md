@@ -113,3 +113,6 @@ Manual testing workflow:
 - **Missing token data** - New tokens may not have complete metadata
 - **pump.fun detection** - Only tokens ending in 'pump' get enhanced analytics
 - **Image downloads** - Network timeouts can prevent logo display
+## Sessions System Behaviors
+
+@CLAUDE.sessions.md
