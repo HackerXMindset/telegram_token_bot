@@ -381,11 +381,13 @@ def format_token_data(data):
 
             parts.append(f'🧑‍💻 <b>Dev (pf/Helius):</b> <a href="{creator_link}">{escape_html(short_addr)}</a> {dev_dot} ({escape_html(dev_status)}) <a href="{stats_link}">[Stats]</a> {sol_balance_str}')
 
+        dex_paid_status = "Not Available"
         dex_paid_dot = "🔴"
-        if price_data.get('pairs') and price_data['pairs'][0].get('info', {}):
+        if price_data.get('pairs') and price_data['pairs'][0].get('info'): # Check if 'info' exists and is not None
+            dex_paid_status = "Available"
             dex_paid_dot = "🟢"
-        info_link = f"https://t.me/phanespurplebot?start=dp_{ca}"
-        parts.append(f'├ <b>DEX (Dex):</b> {escape_html(dex_name)} | <b>DEX Paid (Dex):</b> {dex_paid_dot} <a href="{info_link}">[info]</a>')
+        info_link = f"https://t.me/phanesbot?start=dp_{ca}"
+        parts.append(f'├ <b>DEX (Dex):</b> {escape_html(dex_name)} | <b>DEX Paid (Dex):</b> {dex_paid_dot} {dex_paid_status} <a href="{info_link}">[info]</a>')
         
         parts.append(f'🔧 <b>Mutable (Helius):</b> {"✅" if is_mutable else "❌"}')
         parts.append('')
