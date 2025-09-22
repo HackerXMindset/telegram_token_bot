@@ -248,14 +248,15 @@ async def analyze_token(mint_address):
 
     connector = aiohttp.TCPConnector(limit=100, limit_per_host=20)
     async with aiohttp.ClientSession(connector=connector) as session:
+        # Create tasks properly
         tasks = {
-            "metadata_v1": query_metadata_v1(session, mint_address),
-            "largest_accounts": get_token_largest_accounts(session, mint_address),
-            "asset_data": get_asset(session, mint_address),
-            "supply_info": get_token_supply_info(session, mint_address),
-            "account_info": get_account_info(session, mint_address),
-            "price_data": get_token_price(session, mint_address),
-            "pump_fun_data": get_pump_fun_data(session, mint_address),
+            "metadata_v1": asyncio.create_task(query_metadata_v1(session, mint_address)),
+            "largest_accounts": asyncio.create_task(get_token_largest_accounts(session, mint_address)),
+            "asset_data": asyncio.create_task(get_asset(session, mint_address)),
+            "supply_info": asyncio.create_task(get_token_supply_info(session, mint_address)),
+            "account_info": asyncio.create_task(get_account_info(session, mint_address)),
+            "price_data": asyncio.create_task(get_token_price(session, mint_address)),
+            "pump_fun_data": asyncio.create_task(get_pump_fun_data(session, mint_address)),
         }
 
         # Start creator data task in parallel - it will wait for asset_data internally

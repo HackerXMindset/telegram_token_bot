@@ -109,10 +109,14 @@ HELIUS_API_KEY=your_helius_api_key_here
   - Transaction history and account details
   - Asset information and governance data
 
-- **DexScreener API**: Real-time market data
-  - Current price and percentage changes
-  - Market cap and fully diluted valuation
-  - Trading volume and liquidity metrics
+- **DexScreener API**: Comprehensive real-time trading data
+  - **Price Data**: USD and native token prices
+  - **Volume Analysis**: 5m, 1h, 6h, and 24h trading volumes
+  - **Price Changes**: Multi-timeframe percentage changes (5m, 1h, 6h, 24h)
+  - **Transaction Activity**: Real-time buy/sell counts and ratios
+  - **Liquidity Breakdown**: USD, base token, and quote token liquidity
+  - **Trading Pair Info**: DEX exchange, pair labels, pool age
+  - **Market Metrics**: Market cap, FDV, boost status
 
 - **pump.fun APIs**: Enhanced analytics for pump.fun tokens
   - Bonding curve progress tracking
@@ -129,22 +133,31 @@ HELIUS_API_KEY=your_helius_api_key_here
 ### Example Output
 
 ```
-🚀 Solana Token Analysis
+🚀 Wrapped SOL (SOL)
+So11111111111111111111111111111111111111112
 
-motion (motion)
-DVLd349zCzrSHxWGQrut46f1EffwHoaiwqQVyjixpump
+💰 Price & Market Data
+💵 Price: $223.18000000 | Native: 223.18040000
+🧢 MC: $73,939M | 💎 FDV: $83,456M
+⏱️ Pool Age: 815d | 🏢 DEX: orca
+🏷️ Labels: wp
 
-💰 Market Data
-📊 Price: $0.00012120 (-5.2%)
-💎 FDV: $121,200
-📈 MC: $121,206
-📊 Volume: $45,680 (24h)
+📊 Volume Data
+5m: $1,309,381 | 1h: $11,028,472
+6h: $78,302,763 | 24h: $472,834,854
 
-⚙️ Token Info
-🔢 Supply: 999,999,922 (0.02% burned)
-🔸 Decimals: 6
-🔒 Mutable: ❌
-🏛️ Authority: Verified ✅
+📈 Price Changes
+5m: -0.32% | 1h: +0.53%
+6h: -0.09% | 24h: -7.04%
+
+💧 Liquidity
+USD: $62,368,441
+Base: 177,253 | Quote: 22,808,983
+
+🔄 Transaction Activity
+6h: 5880 buys / 5711 sells
+1h: 795 buys / 772 sells
+6h Buy Ratio: 50.7%
 
 👥 Holders Analysis
 Distribution: 20.0% | 3.4% | 3.1% [Sum: 40.5%]
@@ -157,9 +170,6 @@ Top 10 Details:
 🔒 Security & Governance
 Creator: 9CRdct...8JGbCe (Hold: 0% ✅) [clickable]
 Authority: TSLvdd...t1eokM [clickable]
-
-📈 Recent Activity
-Last 10 transactions with amounts and timestamps...
 ```
 
 ## 🏆 Performance Comparison

@@ -44,11 +44,15 @@ def format_token_data(data):
         supply, price, fdv, market_cap = 0, 0, 0, 0
         is_mutable = False
 
-        if metadata.get('onChainMetadata', {}).get('metadata'):
-            meta = metadata['onChainMetadata']['metadata']
-            name = meta['data'].get('name', 'Unknown').strip()
-            symbol = meta['data'].get('symbol', 'N/A').strip()
-            is_mutable = meta.get('isMutable', False)
+        # Get metadata from the first item in the metadata_v1 list
+        metadata_v1 = data.get('metadata_v1', [])
+        if metadata_v1 and len(metadata_v1) > 0:
+            metadata = metadata_v1[0]
+            if metadata.get('onChainMetadata', {}).get('metadata'):
+                meta = metadata['onChainMetadata']['metadata']
+                name = meta['data'].get('name', 'Unknown').strip()
+                symbol = meta['data'].get('symbol', 'N/A').strip()
+                is_mutable = meta.get('isMutable', False)
 
         # Prioritize pump.fun supply
         supply = pump_fun_data.get('total_supply', supply_info.get('value', {}).get('uiAmount', 0))
@@ -56,21 +60,63 @@ def format_token_data(data):
         if asset_data.get('content', {}).get('links', {}).get('image'):
             image_url = asset_data['content']['links']['image']
 
-        volume_6h, volume_1h, price_change_6h, price_change_1h, liquidity_usd, dex_name, pool_age = 0, 0, 0, 0, 0, "N/A", "N/A"
-        ath_market_cap = advanced_pump_data.get('allTimeHighMarketCap', 0)
+        volume_6h, volume_1h, volume_24h, volume_5m = 0, 0, 0, 0
+        price_change_6h, price_change_1h, price_change_24h, price_change_5m = 0, 0, 0, 0
+        liquidity_usd, liquidity_base, liquidity_quote = 0, 0, 0
+        dex_name, pool_age, price_native = "N/A", "N/A", 0
+        buys_6h, sells_6h, buys_1h, sells_1h = 0, 0, 0, 0
+        pair_labels, boost_active = [], 0
+        ath_market_cap = pump_fun_data.get('allTimeHighMarketCap', 0)
 
         if price_data.get('pairs'):
             pair = price_data['pairs'][0]
             price = float(pair.get('priceUsd', 0))
+            price_native = float(pair.get('priceNative', 0))
+
             # Use pump.fun's market cap when available
             market_cap = pump_fun_data.get('usd_market_cap', float(pair.get('marketCap', 0)))
             fdv = price * supply if supply > 0 else 0
-            volume_6h = float(pair.get('volume', {}).get('h6', 0))
-            volume_1h = float(pair.get('volume', {}).get('h1', 0))
-            price_change_6h = float(pair.get('priceChange', {}).get('h6', 0))
-            price_change_1h = float(pair.get('priceChange', {}).get('h1', 0))
-            liquidity_usd = float(pair.get('liquidity', {}).get('usd', 0))
+
+            # Volume data for multiple timeframes
+            volume_data = pair.get('volume', {})
+            volume_5m = float(volume_data.get('m5', 0))
+            volume_1h = float(volume_data.get('h1', 0))
+            volume_6h = float(volume_data.get('h6', 0))
+            volume_24h = float(volume_data.get('h24', 0))
+
+            # Price change data for multiple timeframes
+            price_change_data = pair.get('priceChange', {})
+            price_change_5m = float(price_change_data.get('m5', 0))
+            price_change_1h = float(price_change_data.get('h1', 0))
+            price_change_6h = float(price_change_data.get('h6', 0))
+            price_change_24h = float(price_change_data.get('h24', 0))
+
+            # Liquidity breakdown
+            liquidity_data = pair.get('liquidity', {})
+            liquidity_usd = float(liquidity_data.get('usd', 0))
+            liquidity_base = float(liquidity_data.get('base', 0))
+            liquidity_quote = float(liquidity_data.get('quote', 0))
+
+            # Transaction activity
+            txns_data = pair.get('txns', {})
+            if txns_data:
+                # Get 6h and 1h transaction data
+                h6_txns = txns_data.get('h6', {})
+                h1_txns = txns_data.get('h1', {})
+                buys_6h = h6_txns.get('buys', 0)
+                sells_6h = h6_txns.get('sells', 0)
+                buys_1h = h1_txns.get('buys', 0)
+                sells_1h = h1_txns.get('sells', 0)
+
+            # DEX and pair info
             dex_name = pair.get('dexId', 'N/A')
+            pair_labels = pair.get('labels', [])
+
+            # Boost information
+            boosts_data = pair.get('boosts', {})
+            boost_active = boosts_data.get('active', 0)
+
+            # Pair creation time
             created_at = pair.get('pairCreatedAt')
             if created_at:
                 try:
@@ -94,11 +140,64 @@ def format_token_data(data):
 
         # Market Data
         ath_market_cap = pump_fun_data.get('ath_market_cap', 0)
-        parts.append(f"🧢 <b>MC (pf):</b> ${market_cap:,.0f} | 💧 <b>Liq:</b> ${liquidity_usd:,.0f}")
-        parts.append(f"💎 <b>FDV:</b> ${fdv:,.0f} | 🔥 <b>ATH (pf):</b> ${ath_market_cap:,.0f}")
-        parts.append(f'📊 <b>Vol (6h):</b> ${volume_6h:,.0f} | <b>(1h):</b> ${volume_1h:,.0f}')
-        parts.append(f'⏱️ <b>Age:</b> {pool_age}')
+        parts.append("💰 <b>Price & Market Data</b>")
+
+        # Price with native price if available
+        price_line = f"💵 <b>Price:</b> ${price:.8f}"
+        if price_native > 0:
+            price_line += f" | <b>Native:</b> {price_native:.8f}"
+        parts.append(price_line)
+
+        parts.append(f"🧢 <b>MC (pf):</b> ${market_cap:,.0f} | 💎 <b>FDV:</b> ${fdv:,.0f}")
+        if ath_market_cap > 0:
+            parts.append(f"🔥 <b>ATH (pf):</b> ${ath_market_cap:,.0f}")
+        parts.append(f'⏱️ <b>Pool Age:</b> {pool_age} | 🏢 <b>DEX:</b> {dex_name}')
+
+        # Pair labels if available
+        if pair_labels:
+            labels_str = ", ".join(pair_labels[:3])  # Show max 3 labels
+            parts.append(f"🏷️ <b>Labels:</b> {labels_str}")
+
+        # Boost status
+        if boost_active > 0:
+            parts.append(f"🚀 <b>Active Boosts:</b> {boost_active}")
+
         parts.append('')
+
+        # Volume Data
+        parts.append("📊 <b>Volume Data</b>")
+        parts.append(f'<b>5m:</b> ${volume_5m:,.0f} | <b>1h:</b> ${volume_1h:,.0f}')
+        parts.append(f'<b>6h:</b> ${volume_6h:,.0f} | <b>24h:</b> ${volume_24h:,.0f}')
+        parts.append('')
+
+        # Price Changes
+        parts.append("📈 <b>Price Changes</b>")
+        def format_change(change):
+            sign = "+" if change >= 0 else ""
+            return f"{sign}{change:.2f}%"
+
+        parts.append(f'<b>5m:</b> {format_change(price_change_5m)} | <b>1h:</b> {format_change(price_change_1h)}')
+        parts.append(f'<b>6h:</b> {format_change(price_change_6h)} | <b>24h:</b> {format_change(price_change_24h)}')
+        parts.append('')
+
+        # Liquidity Breakdown
+        parts.append("💧 <b>Liquidity</b>")
+        parts.append(f"<b>USD:</b> ${liquidity_usd:,.0f}")
+        if liquidity_base > 0 or liquidity_quote > 0:
+            parts.append(f"<b>Base:</b> {liquidity_base:,.0f} | <b>Quote:</b> {liquidity_quote:,.0f}")
+        parts.append('')
+
+        # Transaction Activity
+        if buys_6h > 0 or sells_6h > 0 or buys_1h > 0 or sells_1h > 0:
+            parts.append("🔄 <b>Transaction Activity</b>")
+            parts.append(f'<b>6h:</b> {buys_6h} buys / {sells_6h} sells')
+            parts.append(f'<b>1h:</b> {buys_1h} buys / {sells_1h} sells')
+
+            # Calculate buy/sell ratios if we have data
+            if buys_6h + sells_6h > 0:
+                buy_ratio_6h = (buys_6h / (buys_6h + sells_6h)) * 100
+                parts.append(f'<b>6h Buy Ratio:</b> {buy_ratio_6h:.1f}%')
+            parts.append('')
 
         # Timestamps (pf)
         parts.append("🗓️ <b>Timestamps (pf)</b>")
@@ -121,7 +220,7 @@ def format_token_data(data):
         parts.append('')
 
         # Holders
-        num_holders = advanced_pump_data.get('numHolders')
+        num_holders = pump_fun_data.get('numHolders')
         total_holders = num_holders if num_holders is not None else len(holders_data)
         top10_holders_data = holders_data[:10]
         top10_dist_percent = [ (h.get('uiAmount', 0) / supply * 100) for h in top10_holders_data ]
@@ -132,9 +231,9 @@ def format_token_data(data):
         # Security & Dev
         parts.append('🔒 <b>Security & Dev</b>')
 
-        sniper_count = advanced_pump_data.get('sniperCount')
+        sniper_count = pump_fun_data.get('sniperCount')
         if sniper_count is not None:
-            sniper_percentage = advanced_pump_data.get('sniperOwnedPercentage', 0)
+            sniper_percentage = pump_fun_data.get('sniperOwnedPercentage', 0)
             parts.append(f"⚠️ <b>Risk:</b> Snipers: {sniper_count} ({sniper_percentage:.2f}%)")
 
         creators = asset_data.get('creators', [])
@@ -145,7 +244,7 @@ def format_token_data(data):
             stats_link = f"https://t.me/phanes_bot?start=pfdev_{addr}"
             
             dev_status, dev_dot, sol_balance_text = "N/A", "", ""
-            dev_holdings_percentage = advanced_pump_data.get('devHoldingsPercentage')
+            dev_holdings_percentage = pump_fun_data.get('devHoldingsPercentage')
             
             holding_percentage = -1
             if 'pump' in ca and dev_holdings_percentage is not None:
@@ -188,10 +287,10 @@ def format_token_data(data):
             off_meta = metadata['offChainMetadata']['metadata']
             for field in ['twitter', 'telegram', 'website']:
                 if off_meta.get(field): social_links[field] = off_meta[field]
-        if advanced_pump_data.get("found"):
-            if advanced_pump_data.get('twitter'): social_links['twitter'] = advanced_pump_data['twitter']
-            if advanced_pump_data.get('telegram'): social_links['telegram'] = advanced_pump_data['telegram']
-            if advanced_pump_data.get('website'): social_links['website'] = advanced_pump_data['website']
+        if pump_fun_data.get("found"):
+            if pump_fun_data.get('twitter'): social_links['twitter'] = pump_fun_data['twitter']
+            if pump_fun_data.get('telegram'): social_links['telegram'] = pump_fun_data['telegram']
+            if pump_fun_data.get('website'): social_links['website'] = pump_fun_data['website']
 
         social_parts = []
         if social_links.get('twitter'): social_parts.append(f'<a href="{social_links["twitter"]}">X/Twitter</a>')
