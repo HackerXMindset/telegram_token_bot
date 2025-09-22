@@ -1,0 +1,25 @@
+# Todo List: Add all Dex Screener data to Rust bot output
+
+- [x] **Update `format_token_data` in `src/bot.rs` to include all Dex Screener fields:**
+    - [x] Add DEX ID.
+    - [x] Add Pair Address.
+    - [x] Add DexScreener URL.
+    - [x] Add Base Token Info (Name, Symbol, Address).
+    - [x] Add Quote Token Info (Name, Symbol, Address).
+    - [x] Add Price in Native Currency (SOL).
+    - [x] Add Transaction Counts (buys/sells for 5m, 1h, 6h, 24h).
+    - [x] Add Volume for all timeframes (5m, 1h, 6h).
+    - [x] Add Price Change for all timeframes (5m, 1h, 6h).
+    - [x] Add Detailed Liquidity (base and quote tokens).
+    - [x] Add Pair Creation Date.
+    - [x] Add Socials and Websites from Dex Screener.
+- [x] **Handle long messages:**
+    - [x] In `src/bot.rs`, modify `handle_message` to check the length of the response.
+    - [x] If the message is longer than Telegram's limit (4096 characters), split it into multiple messages.
+- [ ] **Testing and Verification:**
+    - [ ] Build and run the Rust bot.
+    - [ ] Test with a Solana contract address that generates a long response.
+    - [ ] Verify that the message is split into multiple parts if it's too long.
+- [ ] **Finalization:**
+    - [ ] Review and clean up the code.
+    - [ ] Mark all tasks as completed.
