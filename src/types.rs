@@ -11,6 +11,7 @@ pub struct TokenData {
     pub pump_fun_data: Option<PumpFunData>,
     pub jupiter_data: Option<JupiterTokenData>,
     pub dexscreener_orders_data: Option<Vec<DexScreenerOrder>>,
+    pub dev_sol_balance: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -181,14 +182,24 @@ pub struct HoldersData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HoldersResult {
+    pub context: Option<Context>,
     pub value: Option<Vec<TokenHolder>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Context {
+    pub slot: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenHolder {
     pub address: Option<String>,
+    pub amount: Option<String>,
+    pub decimals: Option<u8>,
     #[serde(rename = "uiAmount")]
     pub ui_amount: Option<f64>,
+    #[serde(rename = "uiAmountString")]
+    pub ui_amount_string: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

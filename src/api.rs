@@ -27,52 +27,46 @@ impl ApiClient {
 
     pub async fn analyze_token(&self, mint_address: &str) -> Result<TokenData> {
         let (
-            metadata_result,
             dexscreener_result,
             holders_result,
-            supply_result,
             pump_fun_result,
             jupiter_result,
             dexscreener_orders_result,
         ) = tokio::join!(
-            self.query_metadata_v1(mint_address),
             self.get_dexscreener_data(mint_address),
             self.get_token_largest_accounts(mint_address),
-            self.get_token_supply_info(mint_address),
             self.get_pump_fun_data(mint_address),
             self.fetch_jupiter_token_data(mint_address),
             self.get_dexscreener_orders_data("solana", mint_address),
         );
 
+        // Fetch dev SOL balance if Jupiter data has dev address
+        let dev_sol_balance = if let Ok(jupiter_data) = &jupiter_result {
+            if let Some(dev_address) = &jupiter_data.dev {
+                self.get_sol_balance(dev_address).await.ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let token_data = TokenData {
             mint_address: mint_address.to_string(),
-            metadata: metadata_result.ok(),
+            metadata: None,
             dexscreener_data: dexscreener_result.ok(),
             holders: holders_result.ok(),
-            supply_info: supply_result.ok(),
+            supply_info: None,
             creator_info: None,
             pump_fun_data: pump_fun_result.ok(),
             jupiter_data: jupiter_result.ok(),
             dexscreener_orders_data: dexscreener_orders_result.ok(),
+            dev_sol_balance,
         };
 
         Ok(token_data)
     }
 
-    async fn query_metadata_v1(&self, mint_address: &str) -> Result<MetadataResponse> {
-        let url = format!("https://api.helius.xyz/v0/token-metadata?api-key={}", self.api_key);
-        let payload = json!({
-            "mintAccounts": [mint_address],
-            "includeOffChain": true,
-            "disableCache": false
-        });
-        let response = timeout(
-            Duration::from_secs(3),
-            self.client.post(&url).json(&payload).send()
-        ).await??;
-        let data: Vec<MetadataResponse> = response.json().await?;
-        data.into_iter().next().ok_or_else(|| anyhow!("No metadata found"))
-    }
 
     async fn get_token_largest_accounts(&self, mint_address: &str) -> Result<HoldersData> {
         let url = format!("https://mainnet.helius-rpc.com/?api-key={}", self.api_key);
@@ -90,21 +84,6 @@ impl ApiClient {
         Ok(data)
     }
 
-    async fn get_token_supply_info(&self, mint_address: &str) -> Result<SupplyInfo> {
-        let url = format!("https://mainnet.helius-rpc.com/?api-key={}", self.api_key);
-        let payload = json!({
-            "jsonrpc": "2.0",
-            "id": "1",
-            "method": "getTokenSupply",
-            "params": [mint_address]
-        });
-        let response = timeout(
-            Duration::from_secs(3),
-            self.client.post(&url).json(&payload).send()
-        ).await??;
-        let data: SupplyInfo = response.json().await?;
-        Ok(data)
-    }
 
     async fn get_dexscreener_data(&self, mint_address: &str) -> Result<DexScreenerData> {
         let url = format!("https://api.dexscreener.com/latest/dex/tokens/{}", mint_address);
@@ -163,5 +142,36 @@ impl ApiClient {
 
         let data: Vec<DexScreenerOrder> = response.json().await?;
         Ok(data)
+    }
+
+    async fn get_sol_balance(&self, address: &str) -> Result<f64> {
+        let url = format!("https://mainnet.helius-rpc.com/?api-key={}", self.api_key);
+        let payload = json!({
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "getBalance",
+            "params": [address]
+        });
+        let response = timeout(
+            Duration::from_secs(3),
+            self.client.post(&url).json(&payload).send()
+        ).await??;
+
+        #[derive(serde::Deserialize)]
+        struct BalanceResponse {
+            result: Option<BalanceResult>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct BalanceResult {
+            value: u64,
+        }
+
+        let data: BalanceResponse = response.json().await?;
+        if let Some(result) = data.result {
+            Ok(result.value as f64 / 1_000_000_000.0) // Convert lamports to SOL
+        } else {
+            Err(anyhow!("No balance data found"))
+        }
     }
 }
