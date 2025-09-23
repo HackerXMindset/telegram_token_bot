@@ -225,8 +225,6 @@ pub struct CreatorInfo {
     pub sol_balance: Option<f64>,
 }
 
-
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PumpFunData {
     pub mint: Option<String>,
@@ -279,7 +277,6 @@ pub struct PumpFunData {
     pub thumbnail: Option<String>,
     pub video_uri: Option<String>,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
